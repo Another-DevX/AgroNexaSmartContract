@@ -17,7 +17,13 @@ contract MyToken is ERC1155, Ownable, ERC1155Burnable, ERC1155Supply {
         string uri;
     }
 
+    struct PartialData {
+        uint256 id;
+        uint256 price;
+    }
+
     mapping(uint256 => Batch) Collections;
+    uint256[] private keys;
 
     constructor() ERC1155("") {}
 
@@ -26,8 +32,11 @@ contract MyToken is ERC1155, Ownable, ERC1155Burnable, ERC1155Supply {
         uint256 price,
         string memory uri
     ) public {
-        Batch memory newBatch = Batch(supply, price, uri);
+        Batch memory newBatch = Batch(supply + 1, price, uri);
         Collections[_tokenIdCounter.current()] = newBatch;
+        keys.push(_tokenIdCounter.current());
+        _mint(msg.sender, _tokenIdCounter.current(), 1, "");
+        _tokenIdCounter.increment();
     }
 
     function mint(
@@ -42,15 +51,37 @@ contract MyToken is ERC1155, Ownable, ERC1155Burnable, ERC1155Supply {
         _tokenIdCounter.increment();
     }
 
-    function getCurrentId() public view returns (string[] memory) {
-        uint256 totalIds = _tokenIdCounter.current();
-        string[] memory uris = new string[](totalIds);
+    function getNftData(string memory uri)
+        public
+        view
+        returns (PartialData memory)
+    {
+        uint256 totalBatches = _tokenIdCounter.current(); // Obtenemos el número total de lotes
 
-        for (uint256 i = 1; i <= totalIds; i++) {
-            uris[i - 1] = Collections[i].uri;
+        for (uint256 i = 0; i < totalBatches; i++) {
+            string memory _uriCollection = Collections[i].uri;
+            if (keccak256(bytes(_uriCollection)) == keccak256(bytes(uri))) {
+                PartialData memory data = PartialData(i, Collections[i].price);
+
+                return data;
+            }
+        }
+        revert("This NFT does not exist");
+    }
+
+    function getCurrentId() public view returns (string[] memory) {
+        uint256 currentId = keys.length;
+        string[] memory uris = new string[](currentId);
+
+        for (uint256 i = 0; i < currentId; i++) {
+            uris[i] = Collections[i].uri;
         }
 
         return uris;
+    }
+
+    function Burn(uint256 id) public {
+        _burn(msg.sender, id, balanceOf(msg.sender, id));
     }
 
     // The following functions are overrides required by Solidity.
@@ -66,3 +97,4 @@ contract MyToken is ERC1155, Ownable, ERC1155Burnable, ERC1155Supply {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
 }
+
